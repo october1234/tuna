@@ -1,0 +1,40 @@
+deployment properties: {
+    id: string, permanent
+    name: string
+    description: string, optional
+    ingress: string[]
+    mode: {
+        mode: "dockerfile" | "template" | "image"
+        git: {
+            repository: string
+            branch: string
+        }, only if mode is "dockerfile" or "template"
+        dockerfile: string, only if mode is "dockerfile"
+        template: string, only if mode is "template"
+        image: string, only if mode is "image"
+    }
+    env: (map[k: string]v: string), optional
+    labels: (map[k: string]v: string), optional
+    volumes: (map[name: string]path: string), optional
+}
+
+
+deploy (dockerfile / templates):
+remove old container and image if exists
+pull repo
+build image, tag with tuna-projectid:latest
+run container with name tuna-projectid, using image tuna-projectid:latest
+
+deploy (image):
+pull new image
+remove old container
+start new container
+
+
+
+TODO!!!
+TODO!!!
+TODO!!!
+
+1. Add implementation for ingress
+2. Add all container to the same network as traefik
