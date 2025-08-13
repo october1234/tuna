@@ -1,13 +1,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"maps"
 	"os"
+	"os/exec"
 	"path"
 
-	"github.com/docker/docker/api/types/build"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 )
@@ -15,14 +14,8 @@ import (
 func deploy(deploymentId string, image string, labels, env, volumes H) error {
 	containerName := formatDockerResourceName(deploymentId)
 
-	// 1. Clean existing container
 	if err := deleteContainerByName(dockerClient, containerName); err != nil {
 		return fmt.Errorf("failed to clean existing container: %w", err)
-	}
-
-	// 2. Pull image
-	if err := pullImage(dockerClient, image); err != nil {
-		return fmt.Errorf("failed to pull image %s: %w", image, err)
 	}
 
 	finalLabels := H{
@@ -31,7 +24,6 @@ func deploy(deploymentId string, image string, labels, env, volumes H) error {
 
 	maps.Copy(finalLabels, labels)
 
-	// 3. Run new container
 	if _, err := runContainer(dockerClient, image, containerName, env, finalLabels, volumes); err != nil {
 		return fmt.Errorf("failed to run container: %w", err)
 	}
@@ -43,6 +35,10 @@ func deployFromImage(deployment *Deployment) error {
 	fmt.Println("deployFromImage called with deployment:", deployment.ID)
 	if deployment.ModeData.Mode != ModeImage {
 		return fmt.Errorf("deployFromImage called w`ith non-image mode: %s", deployment.ModeData.Mode)
+	}
+
+	if err := pullImage(dockerClient, deployment.ModeData.Image); err != nil {
+		return fmt.Errorf("failed to pull image %s: %w", deployment.ModeData.Image, err)
 	}
 
 	err := deploy(deployment.ID, deployment.ModeData.Image, deployment.Labels, deployment.Env, deployment.Volumes)
@@ -82,21 +78,22 @@ func deployFromGit(deployment *Deployment) error {
 
 	imageTag := formatBuildImageName(deployment.ID)
 
-	buildContext, err := os.Open(tmpDir)
-	if err != nil {
-		panic(err)
-	}
-	defer buildContext.Close()
+	// buildContext, err := archive.TarWithOptions(tmpDir, &archive.TarOptions{})
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create build context: %v", err)
+	// }
 
-	buildResponse, err := dockerClient.ImageBuild(context.Background(), buildContext, build.ImageBuildOptions{
-		Dockerfile: path.Join(tmpDir, dockerfile),
-		Tags:       []string{imageTag},
-		Remove:     true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to build image: %v", err)
-	}
-	defer buildResponse.Body.Close()
+	// buildResponse, err := dockerClient.ImageBuild(context.Background(), buildContext, build.ImageBuildOptions{
+	// 	Dockerfile: dockerfile,
+	// 	Tags:       []string{imageTag},
+	// 	Remove:     true,
+	// })
+	// if err != nil {
+	// 	return fmt.Errorf("failed to build image: %v", err)
+	// }
+	// defer buildResponse.Body.Close()
+
+	exec.Command("docker", "build", "-t", imageTag, "-f", path.Join(tmpDir, dockerfile), tmpDir).Run()
 
 	err = deploy(deployment.ID, imageTag, deployment.Labels, deployment.Env, deployment.Volumes)
 	if err != nil {

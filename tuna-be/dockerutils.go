@@ -25,6 +25,10 @@ func deleteContainerByName(cli *client.Client, name string) error {
 		return err
 	}
 
+	if len(containers) == 0 {
+		return nil
+	}
+
 	c := containers[0]
 	if err := cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{
 		Force: true,

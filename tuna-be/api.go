@@ -59,7 +59,7 @@ func deployHandler(c *gin.Context) {
 	}
 
 	var deployment Deployment
-	if err := db.First(&deployment, id).Error; err != nil {
+	if err := db.First(&deployment, "id = ?", id).Error; err != nil {
 		c.JSON(404, gin.H{"error": "Deployment not found"})
 		return
 	}
