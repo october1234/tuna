@@ -73,7 +73,8 @@ func runContainer(cli *client.Client, image string, name string, env H, labels H
 		Env:    envArr,
 		Labels: labels,
 	}, &container.HostConfig{
-		Mounts: mounts,
+		Mounts:      mounts,
+		NetworkMode: container.NetworkMode("tuna-ingress"),
 	}, nil, nil, name)
 	if err != nil {
 		return "", err

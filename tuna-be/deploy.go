@@ -11,23 +11,37 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-func deploy(deploymentId string, image string, labels, env, volumes H) error {
-	containerName := formatDockerResourceName(deploymentId)
+func deploy(dep *Deployment, image string) error {
+	containerName := formatDockerResourceName(dep.ID)
 
 	if err := deleteContainerByName(dockerClient, containerName); err != nil {
 		return fmt.Errorf("failed to clean existing container: %w", err)
 	}
 
 	finalLabels := H{
-		"tuna.deployment.id": deploymentId,
+		"tuna.deployment.id": dep.ID,
 	}
 
-	maps.Copy(finalLabels, labels)
+	if len(dep.Ingress) > 0 {
+		rule := ""
+		for i, ingress := range dep.Ingress {
+			rule += "Host(`" + ingress + "`)"
+			if i < len(dep.Ingress)-1 {
+				rule += " || "
+			}
+		}
+		finalLabels["traefik.enable"] = "true"
+		finalLabels["traefik.http.routers."+dep.ID+".rule"] = rule
+		finalLabels["traefik.http.routers."+dep.ID+".entrypoints"] = "web,websecure"
+		finalLabels["traefik.http.routers."+dep.ID+".tls.certresolver"] = "letsencrypt"
+	}
 
-	if _, err := runContainer(dockerClient, image, containerName, env, finalLabels, volumes); err != nil {
+	maps.Copy(finalLabels, dep.Labels)
+
+	if _, err := runContainer(dockerClient, image, containerName, dep.Env, finalLabels, dep.Volumes); err != nil {
 		return fmt.Errorf("failed to run container: %w", err)
 	}
-	fmt.Printf("Deployment %s completed successfully\n", deploymentId)
+	fmt.Printf("Deployment %s completed successfully\n", dep.ID)
 	return nil
 }
 
@@ -41,7 +55,7 @@ func deployFromImage(deployment *Deployment) error {
 		return fmt.Errorf("failed to pull image %s: %w", deployment.ModeData.Image, err)
 	}
 
-	err := deploy(deployment.ID, deployment.ModeData.Image, deployment.Labels, deployment.Env, deployment.Volumes)
+	err := deploy(deployment, deployment.ModeData.Image)
 	if err != nil {
 		fmt.Printf("Failed to deploy: %v\n", err)
 	}
@@ -95,7 +109,7 @@ func deployFromGit(deployment *Deployment) error {
 
 	exec.Command("docker", "build", "-t", imageTag, "-f", path.Join(tmpDir, dockerfile), tmpDir).Run()
 
-	err = deploy(deployment.ID, imageTag, deployment.Labels, deployment.Env, deployment.Volumes)
+	err = deploy(deployment, imageTag)
 	if err != nil {
 		fmt.Printf("Failed to deploy: %v\n", err)
 	}

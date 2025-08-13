@@ -2,29 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 )
 
 var regex = regexp.MustCompile(`^[a-z0-9][a-z0-9_]{2,}$`)
-
-func createTar(dir string) (*os.File, error) {
-	tarFile, err := os.CreateTemp("", "build-context-*.tar")
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.Command("tar", "-cf", tarFile.Name(), "-C", dir, ".")
-	if err := cmd.Run(); err != nil {
-		tarFile.Close()
-		os.Remove(tarFile.Name())
-		return nil, err
-	}
-
-	return tarFile, nil
-}
 
 func validateDeploymentGitData(gitData DeploymentGitData, mode string) error {
 	if gitData.Repository == "" {

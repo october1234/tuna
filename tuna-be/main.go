@@ -26,6 +26,9 @@ func main() {
 	initDocker()
 	initDB()
 
+	if err := ensureTraefikNetwork(); err != nil {
+		log.Fatal("Failed to ensure Traefik network:", err)
+	}
 	if err := ensureTraefik(); err != nil {
 		log.Fatal("Failed to ensure Traefik:", err)
 	}

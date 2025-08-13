@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
@@ -40,6 +42,7 @@ func ensureTraefik() error {
 				"80/tcp":  {{HostPort: "80"}},
 				"443/tcp": {{HostPort: "443"}},
 			},
+			NetworkMode: container.NetworkMode("tuna-ingress"),
 		}, nil, nil, "tuna-traefik")
 
 	if err != nil {
@@ -47,4 +50,36 @@ func ensureTraefik() error {
 	}
 
 	return dockerClient.ContainerStart(context.Background(), "tuna-traefik", container.StartOptions{})
+}
+
+func ensureTraefikNetwork() error {
+	filter := filters.NewArgs()
+	filter.Add("name", "tuna-ingress")
+
+	networks, err := dockerClient.NetworkList(context.Background(), network.ListOptions{
+		Filters: filter,
+	})
+	if len(networks) != 0 {
+		fmt.Println("Docker network tuna-ingress already exists, skipping creation.")
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to list docker networks: %w", err)
+	}
+
+	_, err = dockerClient.NetworkCreate(context.Background(), "tuna-ingress", network.CreateOptions{
+		Driver: "bridge",
+		IPAM: &network.IPAM{
+			Config: []network.IPAMConfig{
+				{
+					Subnet: "172.28.0.0/16",
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create docker network: %w", err)
+	}
+
+	return nil
 }
